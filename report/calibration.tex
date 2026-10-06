@@ -235,7 +235,7 @@ This is easily solved using an ``off-the-shelf" semidefinite programming (SDP) s
 
 \subsection{Quaternion SRKC}
 
-Our semidefinite programming solution to SRKC is tolerant to decent amounts of noise.  However, an SDP solver is a relatively specialized piece of software that is not always available on every platform.  Moreover, many of them do not have permissive licenses (e.g. commercial users must purchase a license), which further limits the practicality of SDP for SRKC.  In the case that an SDP solver is impractical, we can actually reformulate the problem in terms of \textit{unit quaternions} and solve it to global optimality using only simple linear-algebraic operations.  We will call this \textit{quaternion similarity registration with known correspondences} (q-SRKC).  Again I will skip the messy derivation, but it turns out that if you replace the matrix \( R \) with the unit quaternion \( q \), the optimal rotation is
+Our semidefinite programming solution to SRKC is tolerant to decent amounts of noise.  However, an SDP solver is a relatively specialized piece of software that is not always available on every platform.  Moreover, many of them do not have permissive licenses (e.g. commercial users must purchase a license), which further limits the practicality of SDP for SRKC.  In the case that an SDP solver is impractical, we can actually reformulate the problem in terms of \textit{unit quaternions} and solve it to global optimality using only simple linear-algebraic operations.  We will call this \textit{quaternion similarity registration under known correspondences} (q-SRKC).  Again I will skip the messy derivation, but it turns out that if you replace the matrix \( R \) with the unit quaternion \( q \), the optimal rotation is
 
 \begin{align}
 	q^\star &= \arg \max_{q^\top q = 1} q^\top F q , \\
@@ -254,7 +254,7 @@ The introduction of quaternions is not only useful for solving SRKC in the absen
 	y_i = s R x_i + t + \varepsilon_i .
 \end{equation}
 
-This is considered an \textit{outlier correspondence}.  In the presence of outlier correspondences, we can develop an alterative method for SRKC which we will refer to as \textit{robust similarity registration with known correspondences} (R-SRKC).  Suppose the maximum permissible \( \ell_2 \) norm of noise is \( \bar{c} \), and if the noise under the generative model exceeds \( \bar{c} \) for a given correspondence pair, we will label it an outlier correspondence.  Then the optimal quaternion \( q^\star \) is given by
+This is considered an \textit{outlier correspondence}.  In the presence of outlier correspondences, we can develop an alterative method for SRKC which we will refer to as \textit{robust similarity registration under known correspondences} (R-SRKC).  Suppose the maximum permissible \( \ell_2 \) norm of noise is \( \bar{c} \), and if the noise under the generative model exceeds \( \bar{c} \) for a given correspondence pair, we will label it an outlier correspondence.  Then the optimal quaternion \( q^\star \) is given by
 
 \begin{equation}
 	q^\star = \arg \min_{q^\top q = 1} \sum_{i=1}^N \min\left( \left\Vert y_i - s q \circ x_i \circ q^{-1} - t \right\Vert_2^2, \bar{c}^2 \right)
