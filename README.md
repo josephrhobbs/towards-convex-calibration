@@ -2,7 +2,7 @@
 
 Technical report and associated Python code detailing convex formulations for problems in camera calibration and geometric perception.
 
-This repository uses a problem we term the __Similarity Registration under Known Correspondences__ (SRKC) to study a few convex formulations for problems in calibration.  We define SRKC as the registration of two point clouds in 3D under the assumption that they are related by a similarity transform in _Sim(3)_ and corrupted by isotropic Gaussian noise with unknown variance.
+This repository uses a problem we call the __Similarity Registration under Known Correspondences__ (SRKC) to study a few convex formulations for problems in calibration.  We define SRKC as the registration of two point clouds in 3D under the assumption that they are related by a similarity transform in _Sim(3)_ and corrupted by isotropic Gaussian noise with unknown variance.
 
 The technical report on convex formulations in calibration may be found at `report/calibration.pdf`.
 
