@@ -8,10 +8,20 @@ The technical report on convex formulations in calibration may be found at `repo
 
 The Jupyter notebook `towards-convex-calibration.ipynb` demonstrates two of the methods discussed: "vanilla" SRKC and quaternion SRKC (q-SRKC).  You may install the dependencies for the notebook from `requirements.txt`.
 
-The following shows a registration result on the Stanford bunny ([link to point cloud](https://gist.githubusercontent.com/bigsnarfdude/ac6b9911f34630d5b24508e628cfd0b1/raw/8b1ae1fa66b576bc780e7cbc3550da51ffdd80af/bunny.pcd)).
+## Example Registration Result
+
+The following shows a registration result on the Stanford bunny ([link to point cloud](https://gist.githubusercontent.com/bigsnarfdude/ac6b9911f34630d5b24508e628cfd0b1/raw/8b1ae1fa66b576bc780e7cbc3550da51ffdd80af/bunny.pcd)).  The "source" point cloud is shown in _blue_ and a "target" point cloud (translated by an unknown similarity transform and perturbed by isotropic Gaussian noise) is shown in _orange_.  We then estimate the similarity transform using a convex optimization and apply the estimated transform to the source point cloud to obtain the result shown in _green_.  This result is then translated two units to the right (+X) to show the reader the result more clearly.
 
 <p align="center">
 <img src="https://github.com/josephrhobbs/towards-convex-calibration/blob/master/images/srkc.png" alt="Registration result for the Stanford bunny" width="auto" height="500">
+</p>
+
+## Noise vs. Error Plot
+
+We compare measurement noise (in decibels) and solver error (computed using _triple geodesic distance_, see below) in the plot below.  Measurement noise varies between -80 decibels and 20 decibels, in which +20 dB of measurement noise indicates 10 times the characteristic dimension.  We define the _characteristic dimension_ (mean distance of a point from the origin) of the point cloud under test to be unity.  On an Intel(R) Xeon(R) CPU (2.20GHz) the solver achieves a p95 (tail) latency of __38 milliseconds__.
+
+<p align="center">
+<img src="https://github.com/josephrhobbs/towards-convex-calibration/blob/master/images/noise-vs-error.png" alt="Noise versus solver error for the SRKC solver" width="auto" height="500">
 </p>
 
 ## Project Abstract
