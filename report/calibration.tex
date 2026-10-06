@@ -150,7 +150,7 @@ This nonconvexity is highly representative of the type encountered in calibratio
 
 \section{Current Approaches to Calibration}
 
-\textit{demonstrate G-N, L-M, etc. and why they can fail}
+\textit{talk about G-N, L-M, etc. and why they can fail}
 
 \section{Separability of Calibration Problems}
 
@@ -266,7 +266,7 @@ under known global scale \( s \) and known translation \( t \).  This is a \text
 	\{-1, 1\}^N \times \mathrm{Sim(3)}
 \end{equation*}
 
-which is nonconvex in the worst way: the feasible set is disjoint into \( 2^N \) possible points!  There in fact exists a polynomial-time convex formulation for this, which enables \textit{certifiable global optimality} despite not knowing which correspondences are inliers and which are outliers.  I've omitted the full mathematical derivation here, as it is \textit{quite} involved, but I encourage you to check out \cite{quasar} if you're curious.
+which is nonconvex in the worst way: the feasible set is disjoint into \( 2^N \) possible points!  There in fact exists a polynomial-time convex formulation for this, which enables \textit{certifiable global optimality} despite not knowing which correspondences are inliers and which are outliers.  I've omitted the full mathematical derivation here, as it is \textit{quite} involved, but I encourage you to check out \cite{quasar} if you're curious.  For the same reason, I have omitted an implementation of R-SRKC from the accompanying source code.
 
 I'd like to note that, in practice, robust SRKC can be achieved with not much difficulty using graduated non-convexity (GNC).  But I wanted to take the time to emphasize that you can in fact solve this to \textit{certifiable} global optimality by finding the right convex formulation.
 
