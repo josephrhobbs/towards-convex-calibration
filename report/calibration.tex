@@ -1,0 +1,229 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{cite}
+\usepackage{epigraph}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{lineno}
+\usepackage{bbm}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+%% TITLE
+\title{Towards Convex Formulations in Calibration
+\\ {\Large \textsc{Exploring Calibration and Registration over Lie Groups}}
+}
+
+%% AUTHOR
+\author{
+
+\IEEEauthorblockN{1\textsuperscript{st} Joseph Hobbs}
+\IEEEauthorblockA{
+\href{mailto:josephrosshobbs@gmail.com}{josephrosshobbs@gmail.com}
+}
+
+}
+
+\maketitle
+
+\setlength{\epigraphwidth}{\columnwidth}
+\epigraph{\textit{The great watershed in optimization is not between linearity and nonlinearity, but convexity and nonconvexity.}}{\vspace*{1.8mm}\textsc{R. Tyrrell Rockafellar}}
+
+\begin{abstract}
+Calibration is a critical step in building safe and reliable autonomous systems.  Cameras, LiDAR sensors, gyroscopes, inertial measurement units, and other devices give various information about the world around a system.  Effective algorithms for calibration can quickly give the user correct parameters that characterize those devices---previously unknown positions, scales, focal lengths, distortion coefficients, or orientations in space.  Many problems in calibration, however, suffer from various nonconvexities that make global estimation of these parameters difficult to determine correctly, certifiably, or in polynomial time.  Clever convex reformulations of these problems can often bypass these difficulties and achieve correct and certifiable solutions quickly.  Here, we study Similarity Registration with Known Correspondences (SRKC), a simple problem in calibration and point cloud registration involving estimation over a Lie group under isotropic Gaussian noise.  We develop a convex formulation and show how it extends to two variants of the problem: quaternion SRKC (q-SRKC) and robust SRKC (R-SRKC).  To ensure pedagogical value, we choose to implement the accompanying code in Python and release it as open-source.
+\end{abstract}
+
+\begin{IEEEkeywords}
+calibration, point cloud registration, convex analysis, optimization, Lie groups.
+\end{IEEEkeywords}
+
+\section{Calibration as Bayesian Estimation}
+
+\subsection{Introduction}
+
+Calibration---an elusive yet essential problem in contemporary robotics---is defined as ``the process of determining the parameters that define how a sensor captures data from the world" \cite{tangram}.  Though calibration systems deal with vast collections of multimodal data (imagery, LiDAR point clouds, gyroscopic measurements, etc.), the problem can always be formulated as a \textit{Bayesian estimation problem} under a \textit{generative model}.  A highly applicable generative model for calibration---which captures many but not all problems in the field---is given by
+
+\begin{equation}
+	y = f(x; \theta) + \varepsilon.
+	\label{eq:genmodel}
+\end{equation}
+
+Here, I use \( y \) to denote sensor measurements, \( x \) to denote the state of the environment, \( \theta \) to denote \textit{sensor parameters}, and \( \varepsilon \) to denote additive measurement noise.  (I would like to note that measurement noise is not always additive, e.g. in the case that \( y \in \mathrm{SO(3)} \)).
+
+\subsection{Measurement as a Bayesian Update}
+
+The process of \textit{calibration} in this case involves solving for \( \theta \) given a collection of values for \( (x_i, y_i) \).  The Bayesian approach to calibration is rather simple in principle, albeit often quite complex in practice.  All we do is assume that \( \theta \) is a random variable distributed according to some prior density function \( p_\Theta(\theta) \).  In this case (but not all cases!) we assume that we know the state of the environment \( x \) and we are measuring \( y \) from our sensor.  This gives us an \textit{a posteriori} distribution for \( \theta \) according to
+
+\begin{equation}
+	p_\Theta(\theta | x, y) = \frac1Z p_\Theta(\theta) p_Y(y | \theta, x)
+\end{equation}
+
+where \( Z := \int p_Y(y | \theta^\prime, x) \, d\theta^\prime\) is a normalization constant, which in practice is typically intractable.  No matter.  We will see \( Z \) disappear quite soon.
+
+\subsection{Maximum a Posteriori Estimation}
+
+The Bayesian update above gives a \textit{distribution} over sensor parameters \( \theta \), but we really want an \textit{estimator} of the sensor parameters.  Therefore, we apply a \textit{maximum a posteriori} (MAP) estimator to \( p_\Theta(\theta | x, y) \) to obtain a final estimate of the calibration parameters.
+
+\begin{equation}
+	\theta^\star = \arg\max_\theta p_\Theta(\theta | x, y)
+\end{equation}
+
+There are other ways to estimate (e.g. maximum likelihood estimation, minimum mean squares estimation, etc.) and in the case of Gaussian noise \( \varepsilon \) they are all in fact equivalent.  However, maximum a posteriori estimation is elegant because it lends itself well to formulating calibration as an optimization.  We will use \textit{negative log-likelihood} (NLL) to convert this into a minimization problem.
+
+\begin{equation}
+	\theta^\star = \arg\min_\theta -\log p_\Theta(\theta | x, y)
+\end{equation}
+
+Substituting our previous expression for the posterior and dropping the constant term, we get the following.
+
+\begin{align}
+	\theta^\star &= \arg\min_\theta -\log(\frac1Z p_\Theta(\theta) p_Y(y | \theta, x)) \\
+	&= \arg\min_\theta \left[ \log Z - \log p_\Theta(\theta) - \log p_Y(y | \theta, x) \right] \\
+	&= \arg\min_\theta \left[ - \log p_\Theta(\theta) - \log p_Y(y | \theta, x) \right]
+\end{align}
+
+Our final step will be to use our generative model (\ref{eq:genmodel}) to rewrite the evidence (the second term).  We know that, because \( y = f(x; \theta) + \varepsilon \), the only variability in \( y \) derives from the measurement noise \( \varepsilon \) under fixed \( x, \theta \).  Formally,
+
+\begin{equation}
+	p_Y(y | \theta, x) = p_\epsilon(y - f(x; \theta))
+\end{equation}
+
+and we write our final formulation for the calibration problem.
+
+\begin{equation}
+	\boxed{\theta^\star = \arg\min_\theta \left[ - \log p_\Theta(\theta) - \log p_\epsilon(y - f(x; \theta)) \right]}
+	\label{eq:optim}
+\end{equation}
+
+\subsection{Similarity Registration under Known Correspondences}
+
+I address here the challenges of calibration---the challenges of solving the optimization (\ref{eq:optim}).  Throughout this document, I will use a particular problem which I will call \textit{Similarity Registration under Known Correspondences} (SRKC) to demonstrate the relevant mathematical techniques.  Given two point clouds, which I will call \( x \in \mathbb{R}^{3 \times N} \) and \( y \in \mathbb{R}^{3 \times N} \), the objective of SRKC is to estimate the similarity transform \( S \in \mathrm{Sim(3)} \) that relates \( x \) to \( y \) \textit{under known correspondences}.  A similarity transform is the composition of a rigid (distance-preserving) transform over space \( X \in \mathrm{SE(3)} \) composed with a global scale \( s \in \mathbb{R}_+ \).  For a correspondence pair \( (x_i, y_i) \) this looks like
+
+\begin{equation}
+	y_i = s R x_i + t + \varepsilon
+\end{equation}
+
+where \( s \) is the global scale, \( R \in \mathrm{SO(3)} \) is a proper rotation, \( t \in \mathbb{R}^3 \) is a (scaled) translation, and \( \varepsilon \in \mathbb{R}^3 \) is an additive noise.  Here, we will assume that \( \varepsilon \) is isotropic Gaussian noise with known covariance \( \sigma^2 I_3 \).  Finally, we take the priors as
+
+\begin{align}
+	s &\sim \mathcal{N}(0, \sigma_1^2) \; | \; s \ge 0 \\
+	R &\sim \mathrm{Unif}(\cdot) \; | \; R \in \mathrm{SO(3)} \\
+	t &\sim \mathcal{N}(0, \sigma_2^2 I_3) \; | \; t \in \mathbb{R}^3
+\end{align}
+
+and then take \( \sigma_1^2, \sigma_2^2 \rightarrow \infty \) such that we assume to have no prior information whatsoever.  This actually allows us to drop the prior term from the optimization objective and optimize only over the evidence term.  Applying our formulation for calibration we developed earlier, the optimization relevant to SRKC is as follows.
+
+\begin{equation}
+	s^\star, R^\star, t^\star = \arg\min_{s, R, t} \frac{1}{2\sigma^2} \sum_{i=1}^N \left[\left\Vert y_i - s R x_i - t \right\Vert_2^2 \right]
+	\label{eq:srkc}
+\end{equation}
+
+I know that SRKC doesn't look like a typical calibration problem.  It looks like a point registration problem---because it is a point registration problem.  On the one hand, SRKC is definitely useful in calibration.  Imagine I have a LiDAR sensor that outputs point clouds and I am calibrating it against an object with a known shape (like a 3D-printed Stanford bunny) \cite{stanford}, but the sensor outputs point locations in an arbitrary and unknown distance unit.  SRKC would be incredibly useful in a ``similarity iterative closest-point" (similarity ICP) calibration tool for this LiDAR sensor.  On the other hand, solving SRKC is a wonderful exercise because it exposes so clearly many of the problems in calibration.  It requires us to work with Lie groups and non-Euclidean manifolds, it has plenty of local minima to frustrate us, and yet with a bit of coaxing it quickly admits powerful solution techniques which give global optimality.
+
+\section{Mathematical Preliminaries}
+
+\textit{description of Lie groups, manifold optimization, etc.}
+
+\section{Nonconvexities in Calibration}
+
+\subsection{Nonconvexity from Rotations}
+
+The optimization (\ref{eq:srkc}) allows us to solve for the similarity transform \( s^\star, R^\star, t^\star \) that relates two point clouds.  We write the objective again below for convenience, dropping the irrelevant constant factor.
+
+\begin{equation}
+	s^\star, R^\star, t^\star = \arg\min_{s, R, t} \sum_{i=1}^N \left[\left\Vert y_i - s R x_i - t \right\Vert_2^2 \right]
+\end{equation}
+
+The (squared) \( \ell_2 \) norm is a convex function of its input, and the inner vector term \( y_i - s R x_i - t \) is convex jointly in \( s, R, t \)---typically, products of variables (such as \( s R \)) are nonconvex, but in this case, because \( s \ge 0 \), the expression is actually convex.  Because the objective is a linear combination of convex, non-decreasing functions (\( \ell_2 \) norms) of convex expressions, the entire objective here is convex \cite{dcp}.  Unfortunately for us, \( R \) must be a proper rotation (\( R \in \mathrm{SO(3)} \)) and the set of all proper rotations (the Lie group \( \mathrm{SO(3)} \)) is nonconvex.
+
+This nonconvexity is highly representative of the type encountered in calibration.  Estimating rotation is critical in nearly every calibration problem, and the set of all rotations is a nonconvex set.  We will see the challenges that this presents in a bit---and we will also explore methods for coaxing the problem into a convex formulation for solution and formal certification.  However, another nonconvexity exists in calibration as well, albeit a more nefarious and more subtle type.
+
+\subsection{Nonconvexity from Mixed-Integer Formulations}
+
+\textit{explain nonconvexity from MIP}
+
+\section{Current Approaches to Calibration}
+
+\textit{demonstrate G-N, L-M, etc. and why they can fail}
+
+\section{Separability of Calibration Problems}
+
+Many problems in calibration requiring joint estimation can be ``separated" into multiple independent problems---and SRKC is no exception!  Though SRKC involves joint estimation of \( s^\star, R^\star, t^\star \), we can decompose the problem into estimating each of these \textit{sequentially} rather than all at once \cite{teaser}.  Because the objective
+
+\begin{equation}
+	s^\star, R^\star, t^\star = \arg\min_{s, R, t} \sum_{i=1}^N \left[\left\Vert y_i - s R x_i - t \right\Vert_2^2 \right]
+\end{equation}
+
+is convex, and because there are no constraints \( s^\star, t^\star \), we can actually write the global scale \( s^\star \) as a function of the global rotation \( R^\star \), and the global translation \( t^\star \) as a function of both the scale \( s^\star \) and the rotation \( R^\star \).  I'll save you the time and skip the derivations.
+
+\begin{align}
+	s^\star &= \frac{\sum_{i=1}^N y_i^\top R x_i - \frac1N \sum_{i=1}^N \sum_{j=1}^N y_j^\top R x_i}{\sum_{i=1}^N x_i^\top x_i - \frac1N \sum_{i=1}^N \sum_{j=1}^N x_j^\top x_i} \\
+	t^\star &= \frac1N \sum_{i=1}^N \left[ y_i - s^\star R^\star x_i \right]
+\end{align}
+
+Substituting these solutions back into the original objective and simplifying (through a great deal of algebra), we get an extraordinarily elegant formulation for \( R \).
+
+\begin{align}
+	R^\star &= \arg\max_{R \in \mathrm{SO(3)}} \mathrm{tr}( RH )^2 \\
+	\text{where } H &:= \sum_i (x_i - \bar{x}) (y_i - \bar{y})^\top
+\end{align}
+
+and \( \bar{x}, \bar{y} \) represent the centroids of point clouds \( x, y \).  Because \( x^2 \) is monotonically increasing in \( x \), we can make one final change to our expression, and instead write
+
+\begin{align}
+	R^\star &= \arg\max_{R \in \mathrm{SO(3)}} \mathrm{tr}( RH ), \\
+	\text{where } H &:= \sum_i (x_i - \bar{x}) (y_i - \bar{y})^\top .
+\end{align}
+
+This problem easily admits the solution to the \textit{orthogonal Procrustes} problem for rotation estimation.  Simply compute the singular value decomposition (SVD) of \( H \), then write
+
+\begin{align}
+	H &= U \Sigma V^\top \\
+	\therefore R^\star &= V U^\top
+\end{align}
+
+and derive \( s^\star, t^\star \) subsequently.\footnote{Technically, this has no way of enforcing \( \det(R^\star) = 1 \); it only enforces \( \det(R^\star) = \pm 1 \).  If the determinant is negative, then it is easy to write \( R^\star = V \, \mathrm{diag}(1, 1, -1) \, U^\top \). }  However, under various modifications, such as quaternion SRKC or robust SRKC, this problem no longer admits the same SVD solution.  Therefore it is important to develop a more generalizable way of thinking about SRKC.  This brings us to the main focus of this document: exploiting \textit{convexity} in calibration and registration.
+
+\section{Convex Formulations for Calibration}
+
+\textit{show semidefinite relaxation and power iteration}
+
+\textit{show q-SRKC}
+
+\textit{show R-SRKC}
+
+\section{Certifying Calibration Results}
+
+\textit{certify G-N or L-M solutions using SOS} (?)
+
+\section{Discussion}
+
+\textit{talk about benefits, limitations, and future applications}
+
+\section*{Acknowledgements}
+
+The author is deeply grateful to you, reader, for your time and attention.
+
+\section*{Generative AI Statement}
+
+This author holds a deep respect for the inspired applied mathematicians, engineers, and researchers working to build the future of generative models for language, code, and images (``generative AI").  However, at the same time, he holds himself to the highest standard of accountability and accuracy in his work.  He also recognizes that research, development, and writing are deeply human processes that deserve human attention.  Therefore, it is his guarantee that neither this document nor any associated content (including figures and source code) were created or copyedited by generative AI.
+
+\begin{thebibliography}{00}
+
+\bibitem{tangram} Tangram Vision. ``Welcome to MetriCal." \textit{MetriCal Documentation}, Tangram Vision, \href{https://docs.tangramvision.com/metrical/14.1/intro/}{https://docs.tangramvision.com/metrical/14.1/intro/}
+
+\bibitem{stanford} Stanford Computer Graphics Laboratory. ``The Stanford 3D Scanning Repository." Stanford Computer Graphics Laboratory, Stanford University. \href{https://graphics.stanford.edu/data/3Dscanrep/}{https://graphics.stanford.edu/data/3Dscanrep/}
+
+\bibitem{dcp} S. Boyd, S. Diamond, and J. Park. ``Constructive Convex Analysis and Disciplined Convex Programming." Stanford University, \href{https://web.stanford.edu/~boyd/papers/pdf/dcp.pdf}{https://web.stanford.edu/~boyd/papers/pdf/dcp.pdfs}
+
+\bibitem{teaser} H. Yang, J. Shi, and L. Carlone. ``TEASER: Fast and Certifiable Point Cloud Registration." Laboratory for Information and Decision Systems, Massachusetts Institute of Technology. \href{https://arxiv.org/pdf/2001.07715}{https://arxiv.org/pdf/2001.07715}
+
+\end{thebibliography}
+
+\end{document}

@@ -1,0 +1,13 @@
+##############
+# .GITIGNORE #
+##############
+
+# LaTeX build artifacts
+**/*.synctex.gz
+**/*.out
+**/*.log
+**/*.aux
+
+# Python virtual environment and cache files
+**/__pycache__
+**/.venv
