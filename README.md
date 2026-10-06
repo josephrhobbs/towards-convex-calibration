@@ -11,7 +11,7 @@ The Jupyter notebook `towards-convex-calibration.ipynb` demonstrates two of the 
 The following shows a registration result on the Stanford bunny ([link to point cloud](https://gist.githubusercontent.com/bigsnarfdude/ac6b9911f34630d5b24508e628cfd0b1/raw/8b1ae1fa66b576bc780e7cbc3550da51ffdd80af/bunny.pcd)).
 
 <p align="center">
-<img src="https://github.com/josephrhobbs/towards-convex-calibration/blob/master/images/srkc.png" alt="Registration result for the Stanford bunny." width="auto" height="200">
+<img src="https://github.com/josephrhobbs/towards-convex-calibration/blob/master/images/srkc.png" alt="Registration result for the Stanford bunny" width="auto" height="500">
 </p>
 
 ## Project Abstract
@@ -25,7 +25,7 @@ The following abstract is copied from the project report at [`report/calibration
 The Jupyter notebook in this repository measures solver error using the __triple geodesic distance__ on the _Sim(3)_ manifold.  The equations below show the triple geodesic distance as the root-mean-square of geodesic distances on the positive reals (for scale), on _SO(3)_ (for rotation), and on 3-dimensional Euclidean space (for translation) respectively.
 
 <p align="center">
-<img src="https://github.com/josephrhobbs/towards-convex-calibration/blob/master/images/triple-geodesic.png" alt="Mathematical formulas for computing triple geodesic distance on the Sim(3) manifold." width="auto" height="200">
+<img src="https://github.com/josephrhobbs/towards-convex-calibration/blob/master/images/triple-geodesic.png" alt="Mathematical formulas for computing triple geodesic distance on the Sim(3) manifold" width="auto" height="200">
 </p>
 
 ## Generative AI Statement
