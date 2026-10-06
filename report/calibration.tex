@@ -36,7 +36,7 @@
 \epigraph{\textit{The great watershed in optimization is not between linearity and nonlinearity, but convexity and nonconvexity.}}{\vspace*{1.8mm}\textsc{R. Tyrrell Rockafellar}}
 
 \begin{abstract}
-Calibration is a critical step in building safe and reliable autonomous systems.  Cameras, LiDAR sensors, gyroscopes, inertial measurement units, and other devices give various information about the world around a system.  Effective algorithms for calibration can quickly give the user correct parameters that characterize those devices---previously unknown positions, scales, focal lengths, distortion coefficients, or orientations in space.  Many problems in calibration, however, suffer from various nonconvexities that make global estimation of these parameters difficult to determine correctly, certifiably, or in polynomial time.  Clever convex reformulations of these problems can often bypass these difficulties and achieve correct and certifiable solutions quickly.  Here, we study Similarity Registration with Known Correspondences (SRKC), a simple problem in calibration and point cloud registration involving estimation over a Lie group under isotropic Gaussian noise.  We develop a convex formulation and show how it extends to two variants of the problem: quaternion SRKC (q-SRKC) and robust SRKC (R-SRKC).  To ensure pedagogical value, we choose to implement the accompanying code in Python and release it as open-source.
+Calibration is a critical step in building safe and reliable autonomous systems.  Cameras, LiDAR sensors, gyroscopes, inertial measurement units, and other devices give various information about the world around a system.  Effective algorithms for calibration can quickly give the user correct parameters that characterize those devices---previously unknown positions, scales, focal lengths, distortion coefficients, or orientations in space.  Many problems in calibration, however, suffer from various nonconvexities that make global estimation of these parameters difficult to determine correctly, certifiably, or in polynomial time.  Clever convex reformulations of these problems can often bypass these difficulties and achieve correct and certifiable solutions quickly.  Here, we study Similarity Registration with Known Correspondences (SRKC), a common problem in calibration and point cloud registration involving estimation over a Lie group under isotropic Gaussian noise.  We develop a convex formulation and show how it extends to two variants of the problem: quaternion SRKC (q-SRKC) and robust SRKC (R-SRKC).  We discuss applications of the methods developed here to real perception and calibration systems, and to preserve pedagogical value, we choose to implement the accompanying code in Python and release it as open-source.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -106,10 +106,10 @@ and we write our final formulation for the calibration problem.
 I address here the challenges of calibration---the challenges of solving the optimization (\ref{eq:optim}).  Throughout this document, I will use a particular problem which I will call \textit{Similarity Registration under Known Correspondences} (SRKC) to demonstrate the relevant mathematical techniques.  Given two point clouds, which I will call \( x \in \mathbb{R}^{3 \times N} \) and \( y \in \mathbb{R}^{3 \times N} \), the objective of SRKC is to estimate the similarity transform \( S \in \mathrm{Sim(3)} \) that relates \( x \) to \( y \) \textit{under known correspondences}.  A similarity transform is the composition of a rigid (distance-preserving) transform over space \( X \in \mathrm{SE(3)} \) composed with a global scale \( s \in \mathbb{R}_+ \).  For a correspondence pair \( (x_i, y_i) \) this looks like
 
 \begin{equation}
-	y_i = s R x_i + t + \varepsilon
+	y_i = s R x_i + t + \varepsilon_i
 \end{equation}
 
-where \( s \) is the global scale, \( R \in \mathrm{SO(3)} \) is a proper rotation, \( t \in \mathbb{R}^3 \) is a (scaled) translation, and \( \varepsilon \in \mathbb{R}^3 \) is an additive noise.  Here, we will assume that \( \varepsilon \) is isotropic Gaussian noise with known covariance \( \sigma^2 I_3 \).  Finally, we take the priors as
+where \( s \) is the global scale, \( R \in \mathrm{SO(3)} \) is a proper rotation, \( t \in \mathbb{R}^3 \) is a (scaled) translation, and \( \varepsilon \in \mathbb{R}^3 \) is an additive noise.  Here, we will assume that \( \varepsilon_i \) is isotropic Gaussian noise with known covariance \( \sigma^2 I_3 \).  Finally, we take the priors as
 
 \begin{align}
 	s &\sim \mathcal{N}(0, \sigma_1^2) \; | \; s \ge 0 \\
@@ -188,19 +188,87 @@ This problem easily admits the solution to the \textit{orthogonal Procrustes} pr
 	\therefore R^\star &= V U^\top
 \end{align}
 
-and derive \( s^\star, t^\star \) subsequently.\footnote{Technically, this has no way of enforcing \( \det(R^\star) = 1 \); it only enforces \( \det(R^\star) = \pm 1 \).  If the determinant is negative, then it is easy to write \( R^\star = V \, \mathrm{diag}(1, 1, -1) \, U^\top \). }  However, under various modifications, such as quaternion SRKC or robust SRKC, this problem no longer admits the same SVD solution.  Therefore it is important to develop a more generalizable way of thinking about SRKC.  This brings us to the main focus of this document: exploiting \textit{convexity} in calibration and registration.
+and derive \( s^\star, t^\star \) subsequently.\footnote{Technically, this doesn't \textit{quite} work because it has no way of enforcing \( \det(R^\star) = 1 \); it only enforces \( \det(R^\star) = \pm 1 \).  If the determinant is negative, then it is easy to write \( R^\star = V \, \mathrm{diag}(1, 1, -1) \, U^\top \). }  However, under various modifications, such as quaternion SRKC or robust SRKC, this problem no longer admits the same SVD solution.  Therefore it is important to develop a more generalizable way of thinking about SRKC.  This brings us to the main focus of this document: exploiting \textit{convexity} in calibration and registration.
 
 \section{Convex Formulations for Calibration}
 
-\textit{show semidefinite relaxation and power iteration}
+We're now at the heart of this.  We just said above that our constraint \( R \in \mathrm{SO(3)} \) was nonconvex.  So why are we thinking about convexity in calibration?  Because \textit{properly formulated, many optimizations can be treated as convex} even if the original problem was not.  I emphasized earlier that a benefit of convexity is \textit{certifiability}.  This means that, if the Karush-Kuhn-Tucker conditions (KKT) are satisfied for an optimizer of the convex formulation, we have \textit{mathematical proof} that we've found the \textit{global optimizer} for our estimation problem \cite{kkt}.  It is a tremendous peace of mind to have rigorous \textit{proof that we can't do any better}---if our solution is KKT, then there is no better solution elsewhere in the feasible set.
 
-\textit{show q-SRKC}
+\subsection{Relaxation of the Special Orthogonal Group}
 
-\textit{show R-SRKC}
+Our first example here will be to relax the constraint \( R \in \mathrm{SO(3)} \).  A necessary (but not sufficient)\footnote{Again, we must enforce positivity of the determinant to make sure this is a \textit{proper} rotation.  And again, this is not difficult using a quick SVD check at the end.} condition for \( R \in \mathrm{SO(3)} \) is \( I - R^\top R = 0 \); in other words, the matrix columns must form an orthonormal basis for \( \mathbb{R}^3 \).  Funnily enough, we can actually relax this constraint to
 
-\section{Certifying Calibration Results}
+\begin{equation}
+	I - R^\top R \succeq 0
+\end{equation}
 
-\textit{certify G-N or L-M solutions using SOS} (?)
+(in other words, \( I - R^\top R \) has no negative eigenvalues) and we typically recover globally optimal solutions in practice.  This works because the \textit{positive semidefinite cone} (the set of all matrices with no negative eigenvalues) is actually convex, whereas the set \( \mathrm{SO(3)} \) is nonconvex, and \textit{critically}, all proper rotations satisfy this new condition.  This expression is actually the Schur complement of the larger expression
+
+\begin{equation}
+	\begin{bmatrix}
+		I & R \\
+		R^\top & I \\
+	\end{bmatrix} \succeq 0
+\end{equation}
+
+and so, in practice, we use this constraint instead because it is linear in \( R \).  We now have a completely \textit{convex} formulation by removing the constraint \( R \in \mathrm{SO(3)} \) and replacing it with our new linear matrix inequality (LMI).
+
+\begin{align}
+	R^\star &= \arg\max_{R} \mathrm{tr}( RH ), \\
+	\text{where } H &:= \sum_i (x_i - \bar{x}) (y_i - \bar{y})^\top \\
+	& \begin{bmatrix}
+		I & R \\
+		R^\top & I \\
+	\end{bmatrix} \succeq 0
+\end{align}
+
+This is easily solved using an ``off-the-shelf" semidefinite programming (SDP) solver.  In practice, this will nearly always recover a proper rotation \( R \in \mathrm{SO(3)} \), even though we did not explicitly impose that requirement.  However, if the problem does not recover a proper rotation, then a simple projection onto the positive semidefinite cone will recover the closest valid rotation (in the least-squares sense).
+
+\begin{align}
+	R^\star &= U \Sigma V^\top \\
+	R^\star &\gets U \begin{bmatrix}
+		1 & 0 & 0 \\
+		0 & 1 & 0 \\
+		0 & 0 & \det U V^\top
+	\end{bmatrix} V^\top
+\end{align}
+
+\subsection{Quaternion SRKC}
+
+Our semidefinite programming solution to SRKC is tolerant to decent amounts of noise.  However, an SDP solver is a relatively specialized piece of software that is not always available on every platform.  Moreover, many of them do not have permissive licenses (e.g. commercial users must purchase a license), which further limits the practicality of SDP for SRKC.  In the case that an SDP solver is impractical, we can actually reformulate the problem in terms of \textit{unit quaternions} and solve it to global optimality using only simple linear-algebraic operations.  We will call this \textit{quaternion similarity registration with known correspondences} (q-SRKC).  Again I will skip the messy derivation, but it turns out that if you replace the matrix \( R \) with the unit quaternion \( q \), the optimal rotation is
+
+\begin{align}
+	q^\star &= \arg \max_{q^\top q = 1} q^\top F q , \\
+	\text{where } F &:= \cdots .
+\end{align}
+
+\textit{explain that q-SRKC always returns a valid rotation}
+
+\textit{this isn't new---refer to Davenport's \( q \)-method for AD}
+
+\subsection{Robust SRKC}
+
+The introduction of quaternions is not only useful for solving SRKC in the absence of an SDP solver---it is also useful for solving the SRKC problem in the presence of \textit{outlier correspondences}.  Imagine that, with probability \( 1 - \eta \) (where \( \eta \) is the ``inlier fraction"), the point pair \( (x_i, y_i) \) are labeled as a correspondence pair despite \textit{not} being related by the generative model
+
+\begin{equation}
+	y_i = s R x_i + t + \varepsilon_i .
+\end{equation}
+
+This is considered an \textit{outlier correspondence}.  In the presence of outlier correspondences, we can develop an alterative method for SRKC which we will refer to as \textit{robust similarity registration with known correspondences} (R-SRKC).  Suppose the maximum permissible \( \ell_2 \) norm of noise is \( \bar{c} \), and if the noise under the generative model exceeds \( \bar{c} \) for a given correspondence pair, we will label it an outlier correspondence.  Then the optimal quaternion \( q^\star \) is given by
+
+\begin{equation}
+	q^\star = \arg \min_{q^\top q = 1} \sum_{i=1}^N \min\left( \left\Vert y_i - s q \circ x_i \circ q^{-1} - t \right\Vert_2^2, \bar{c}^2 \right)
+\end{equation}
+
+under known global scale \( s \) and known translation \( t \).  This is a \textit{horribly} nonconvex problem.  The inner \( \min(\cdot, \cdot) \) operation induces a combinatorial explosion in the feasible set.  Under a specific reformulation, the feasible set is
+
+\begin{equation*}
+	\{-1, 1\}^N \times \mathrm{Sim(3)}
+\end{equation*}
+
+which is nonconvex in the worst way: the feasible set is disjoint into \( 2^N \) possible points!  There in fact exists a polynomial-time convex formulation for this, which enables \textit{certifiable global optimality} despite not knowing which correspondences are inliers and which are outliers.  I've omitted the full mathematical derivation here, as it is \textit{quite} involved, but I encourage you to check out \cite{quasar} if you're curious.
+
+I'd like to note that, in practice, robust SRKC can be achieved with not much difficulty using graduated non-convexity (GNC).  But I wanted to take the time to emphasize that you can in fact solve this to \textit{certifiable} global optimality by finding the right convex formulation.
 
 \section{Discussion}
 
@@ -208,11 +276,11 @@ and derive \( s^\star, t^\star \) subsequently.\footnote{Technically, this has n
 
 \section*{Acknowledgements}
 
-The author is deeply grateful to you, reader, for your time and attention.
+I am deeply grateful to you, dear reader, for your time and attention.
 
 \section*{Generative AI Statement}
 
-This author holds a deep respect for the inspired applied mathematicians, engineers, and researchers working to build the future of generative models for language, code, and images (``generative AI").  However, at the same time, he holds himself to the highest standard of accountability and accuracy in his work.  He also recognizes that research, development, and writing are deeply human processes that deserve human attention.  Therefore, it is his guarantee that neither this document nor any associated content (including figures and source code) were created or copyedited by generative AI.
+I hold a deep respect for the inspired applied mathematicians, engineers, and researchers working to build the future of generative models for language, code, and images (``generative AI").  However, at the same time, I hold myself to the highest standard of accountability and accuracy in my work.  I also recognize that research, development, and writing are deeply human processes that deserve human attention.  Therefore, it is my guarantee that neither this document nor any associated content (including figures and source code) were created or copyedited by generative AI.
 
 \begin{thebibliography}{00}
 
@@ -223,6 +291,10 @@ This author holds a deep respect for the inspired applied mathematicians, engine
 \bibitem{dcp} S. Boyd, S. Diamond, and J. Park. ``Constructive Convex Analysis and Disciplined Convex Programming." Stanford University, \href{https://web.stanford.edu/~boyd/papers/pdf/dcp.pdf}{https://web.stanford.edu/~boyd/papers/pdf/dcp.pdfs}
 
 \bibitem{teaser} H. Yang, J. Shi, and L. Carlone. ``TEASER: Fast and Certifiable Point Cloud Registration." Laboratory for Information and Decision Systems, Massachusetts Institute of Technology. \href{https://arxiv.org/pdf/2001.07715}{https://arxiv.org/pdf/2001.07715}
+
+\bibitem{kkt} R. Tibshirani. ``Karush-Kuhn-Tucker Conditions." Carnegie Mellon University, \href{https://www.stat.cmu.edu/~ryantibs/convexopt/lectures/kkt.pdf}{https://www.stat.cmu.edu/~ryantibs/convexopt/lectures/kkt.pdf}
+
+\bibitem{quasar} H. Yang and L. Carlone. ``A Quaternion-based Certifiably Optimal Solution to the Wahba Problem with Outliners." Laboratory for Information and Decision Systems, Massachusetts Institute of Technology, \href{https://arxiv.org/pdf/1905.12536}{https://arxiv.org/pdf/1905.12536}
 
 \end{thebibliography}
 
