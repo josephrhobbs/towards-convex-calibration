@@ -126,6 +126,12 @@ and then take \( \sigma_1^2, \sigma_2^2 \rightarrow \infty \) such that we assum
 
 I know that SRKC doesn't look like a typical calibration problem.  It looks like a point registration problem---because it is a point registration problem.  On the one hand, SRKC is definitely useful in calibration.  Imagine I have a LiDAR sensor that outputs point clouds and I am calibrating it against an object with a known shape (like a 3D-printed Stanford bunny) \cite{stanford}, but the sensor outputs point locations in an arbitrary and unknown distance unit.  SRKC would be incredibly useful in a ``similarity iterative closest-point" (similarity ICP) calibration tool for this LiDAR sensor.  On the other hand, solving SRKC is a wonderful exercise because it exposes so clearly many of the problems in calibration.  It requires us to work with Lie groups and non-Euclidean manifolds, it has plenty of local minima to frustrate us, and yet with a bit of coaxing it quickly admits powerful solution techniques which give global optimality.
 
+\subsection{A Note about Solution Methods}
+
+I would like to note that this work does not discount the value of the Gauss-Newton method, the Levenberg-Marquardt method, and other ``local" solvers, neither does it discount the value of probabilistic or exhaustive methods for robust calibration such as Random Sample Consensus (RANSAC) or Branch-and-Bound (BnB) algorithms.  Although they lack theoretical guarantees, these solvers are often highly effective at calibration in production systems, and with some mild discomfort and hyperparameter tweaking on the user's part they can work extremely well in practice on both convex and nonconvex problems.
+
+I have prepared this report and its associated code to highlight the benefits that convex optimization offers in many (but not all) cases.  I encourage us both to remember, as we work through solution methods for SRKC, that convex optimization should be \textit{another tool in our calibration toolbox}, rather than the ``end-all-be-all" approach for every situation.  Convex programming, despite its polynomial-time convergence, guarantee of global optimality, and highly expressive nature, can still be slower (or intractable) in practice.  But many times, it is an incredibly powerful tool that reveals efficient algorithms for certifiable solutions to problems in calibration.
+
 \section{Nonconvexities in Calibration}
 
 \subsection{Nonconvexity from Bilinearity}
@@ -145,10 +151,6 @@ The bilinearity is not the only source of nonconvexity in (\ref{eq:srkc}).  Unfo
 \subsection{Nonconvexity from Mixed-Integer Formulations}
 
 Nonconvexity also originates in calibration through \textit{robust approaches} that have mixed-integer formulations.  Often, part of the calibration process is determining which data are ``inliers" and which data are ``outliers".  For \( N \) independent measurements, there are \( 2^N \) possible classifications.  The ``inlier"/``outlier" taxonomy can be written in terms of binary decision variables \( \theta_i = \pm 1 \) for each of \( i = 1, 2, \cdots N \), such that \( \theta_i = +1 \) indicates that point \( i \) is an inlier and \( \theta_i = -1 \) indicates that point \( i \) is an outlier.  This allows us to construct \textit{mixed-integer programming} (MIP) formulations for robust calibration or registration systems.  MIP is inherently nonconvex (as the feasible set is disconnected) and NP-hard due to its combinatorial nature.
-
-\section{Current Approaches to Calibration}
-
-\textit{talk about G-N, L-M, etc. and why they can fail}
 
 \section{Separability of Calibration Problems}
 
@@ -176,7 +178,7 @@ and \( \bar{x}, \bar{y} \) represent the centroids of point clouds \( x, y \).  
 
 \begin{align}
 	R^\star &= \arg\max_{R \in \mathrm{SO(3)}} \mathrm{tr}( RH ), \\
-	\text{where } H &:= \sum_i (x_i - \bar{x}) (y_i - \bar{y})^\top .
+	\text{where } H &:= \sum_i (x_i - \bar{x}) (y_i - \bar{y})^\top \label{eq:h} .
 \end{align}
 
 This problem easily admits the solution to the \textit{orthogonal Procrustes} problem for rotation estimation.  Simply compute the singular value decomposition (SVD) of \( H \), then write
@@ -263,7 +265,7 @@ and linearize it by introducing \( \gamma := s^2 \).  This eliminates \( s \) co
 from the previous section.  We write \( a_i := x - \bar{x} \) and \( b_i := y_i - \bar{y} \) for the points in each point cloud, with \( a \) and \( b \) having a shared centroid at the origin, removing \( t \) as a decision variable.  The final steps are to interpret this LMI as the Schur complement of a larger expression, allowing the optimization to admit a standard semidefinite programming form, and to write \( \gamma \ge 0 \) because \( s^2 \ge 0 \).
 
 \begin{align}
-	\gamma^\star, Q^\star = \arg\min_{\gamma, Q, t} & \sum_{i=1}^N \left[\left\Vert b_i - Q a_i \right\Vert_2^2 \right] , \\
+	\gamma^\star, Q^\star = \arg\min_{\gamma, Q} & \sum_{i=1}^N \left[\left\Vert b_i - Q a_i \right\Vert_2^2 \right] , \\
 	\text{subject to } & \begin{bmatrix}
 		\gamma I_3 & Q \\
 		Q^\top & I_3 \\
@@ -293,16 +295,30 @@ Obviously, we've lost sight of the \textit{actual} variables we care about, \( s
 
 \subsection{Quaternion SRKC}
 
-Our semidefinite programming solution to SRKC is tolerant to decent amounts of noise.  However, an SDP solver is a relatively specialized piece of software that is not always available on every platform.  Moreover, many of them do not have permissive licenses (e.g. commercial users must purchase a license), which further limits the practicality of SDP for SRKC.  In the case that an SDP solver is impractical, we can actually reformulate the problem in terms of \textit{unit quaternions} and solve it to global optimality using only simple linear-algebraic operations.  We will call this \textit{quaternion similarity registration under known correspondences} (q-SRKC).  Again I will skip the messy derivation, but it turns out that if you replace the matrix \( R \) with the unit quaternion \( q \), the optimal rotation is
+Our semidefinite programming solution to SRKC is tolerant to decent amounts of noise.  However, an SDP solver is a relatively specialized piece of software that is not always available on every platform.  Moreover, many of them do not have permissive licenses (e.g. commercial users must purchase a license), which further limits the practicality of SDP for SRKC.  In the case that an SDP solver is impractical, we can actually reformulate the problem in terms of \textit{unit quaternions} and solve it to global optimality using only simple linear-algebraic operations.  This may also be preferable to the SVD method for vanilla SRKC under certain circumstances.  We will call this \textit{quaternion similarity registration under known correspondences} (q-SRKC).  Again I will skip the messy derivation, but it turns out that if you replace the matrix \( R \) with the unit quaternion \( q \), the optimal rotation is
 
 \begin{align}
 	q^\star &= \arg \max_{q^\top q = 1} q^\top F q , \\
-	\text{where } F &:= \cdots .
+	\text{where } F &:= \begin{bmatrix}
+		\sigma & z^\top \\
+		z & S - \sigma I_3 \\
+	\end{bmatrix}  ,\\
+	\sigma &:= \mathrm{tr}(H) , \\
+	S &:= H + H^\top , \\
+	z &:= \begin{bmatrix}
+		H_{23} - H_{32} \\
+		H_{31} - H_{13} \\
+		H_{12} - H_{21}
+	\end{bmatrix}
 \end{align}
 
-\textit{explain that q-SRKC always returns a valid rotation}
+and \( H \) is the matrix computed in (\ref{eq:h}).  The constraint \( q^\top q = 1 \) makes this optimization nonconvex.  However, it is not difficult to recognize that the objective is maximized when \( q \) is (anti)parallel to the eigenvector of \( F \) with maximum associated eigenvalue.  The \textit{power iteration} algorithm is highly efficient for computing the maximum eigenvector associated to \( F \).  Simply select \( q_0 \) to be any quaternion you wish, then iteratively compute
 
-\textit{this isn't new---refer to Davenport's \( q \)-method for AD}
+\begin{equation}
+	q_{k+1} \gets F q_k / \left\Vert F q_k \right\Vert_2
+\end{equation}
+
+until the algorithm converges, and \( q_k \) is guaranteed to be the eigenvector of \( F \) with maximum eigenvalue (up to numerical precision).  Because this algorithm returns unit quaternions by construction, it is not necessary to project its results onto \( \mathrm{SO(3)} \), unlike the methods for SRKC and C-SRKC.  This algorithm is by no means novel---it is, in fact, Davenport's \( q \)-method used by attitude determination systems aboard spacecraft \cite{davenport}.
 
 \subsection{Robust SRKC}
 
@@ -330,7 +346,20 @@ I'd like to note that, in practice, robust SRKC can be achieved with not much di
 
 \section{Discussion}
 
-\textit{talk about benefits, limitations, and future applications}
+We've now seen four ways of approaching the problem of Similarity Registration under Known Correspondences.
+
+\begin{enumerate}
+	\item A \textit{vanilla} SRKC approach, using either SVD or convex optimization to solve for the optimal rotation, followed by determination of the optimal scale and translation;
+	\item A \textit{constrained} SRKC approach which extends the vanilla SRKC convex formulation in the presence of constraints, such as minimum or maximum global scales;
+	\item A \textit{quaternion} SRKC approach which solves the unconstrained problem in the absence of a dedicated semidefinite programming or singular value decomposition solver; and
+	\item A \textit{robust} SRKC approach which simultaneously classifies correspondences as ``inlier" or ``outlier".
+\end{enumerate}
+
+All of these methods but q-SRKC involved a convex optimization, and all of them enabled the problem to be solved to \textit{global optimality} efficiently.  This highlights the expressivity of convex optimization as a language for expressing problems in calibration.
+
+Of course, as I mentioned above, I have no intention of discounting the benefits of Gauss-Newton, Levenberg-Marquardt, RANSAC, BnB, or other algorithms frequently used in calibration!  I selected SRKC as a problem of study and formulated three of its variants as a convex optimization because convex programming has two qualities I greatly value.  Firstly, convex optimizations \textit{do not require a good initial guess} to get a good final answer---because the problem is convex, there is one global optimum and your iterates will converge towards it by the properties of the algorithm your solver uses.  Secondly, convex optimizations \textit{always achieve the global optimum} and never fall into local minima---iterates never ``get stuck" and stall out in a poor solution.
+
+These are both strongly desirable properties in calibration, because users are more likely to trust solvers that always output good answers without the need for manual tuning or ``fiddling with hyperparameters", and accurate calibration in the presence of uncertainty means safer, more reliable autonomous systems.
 
 \section*{Acknowledgements}
 
@@ -355,6 +384,8 @@ I hold a deep respect for the inspired applied mathematicians, engineers, and re
 \bibitem{quasar} H. Yang and L. Carlone. ``A Quaternion-based Certifiably Optimal Solution to the Wahba Problem with Outliners." Laboratory for Information and Decision Systems, Massachusetts Institute of Technology, \href{https://arxiv.org/pdf/1905.12536}{https://arxiv.org/pdf/1905.12536}
 
 \bibitem{cvx} CVX Research. ``Software for Disciplined Convex Programming." CVX Research, \href{https://cvxr.com/}{https://cvxr.com/}
+
+\bibitem{davenport} M. Garcia. ``Davenport's q-Method." \textit{Attitude and Heading Reference Systems}, \href{https://ahrs.readthedocs.io/en/latest/filters/davenport.html}{https://ahrs.readthedocs.io/en/latest/filters/davenport.html}
 
 \end{thebibliography}
 
