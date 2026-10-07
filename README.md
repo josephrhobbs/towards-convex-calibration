@@ -6,7 +6,7 @@ This repository uses a problem we call the __Similarity Registration under Known
 
 The technical report on convex formulations in calibration may be found at `report/calibration.pdf`.
 
-The Jupyter notebook `code/towards-convex-calibration.ipynb` demonstrates two of the methods discussed: "vanilla" SRKC and quaternion SRKC (q-SRKC).  You may install the dependencies for the notebook from `requirements.txt`.
+The Jupyter notebook `code/towards-convex-calibration.ipynb` demonstrates three of the methods discussed: "vanilla" SRKC, constrained SRKC (C-SRKC), and quaternion SRKC (q-SRKC).  You may install the dependencies for the notebook from `requirements.txt`.
 
 ## Example Registration Result
 
