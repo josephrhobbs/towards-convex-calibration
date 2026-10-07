@@ -36,7 +36,7 @@
 \epigraph{\textit{The great watershed in optimization is not between linearity and nonlinearity, but convexity and nonconvexity.}}{\vspace*{1.8mm}\textsc{R. Tyrrell Rockafellar}}
 
 \begin{abstract}
-Calibration is a critical step in building safe and reliable autonomous systems.  Cameras, LiDAR sensors, gyroscopes, inertial measurement units, and other devices give various information about the world around a system.  Effective algorithms for calibration can quickly give the user correct parameters that characterize those devices---previously unknown positions, scales, focal lengths, distortion coefficients, or orientations in space.  Many problems in calibration, however, suffer from various nonconvexities that make global estimation of these parameters difficult to determine correctly, certifiably, or in polynomial time.  Clever convex reformulations of these problems can often bypass these difficulties and achieve correct and certifiable solutions quickly.  Here, we study Similarity Registration with Known Correspondences (SRKC), a common problem in calibration and point cloud registration involving estimation over a Lie group under isotropic Gaussian noise.  We develop a convex formulation and show how it extends to two variants of the problem: quaternion SRKC (q-SRKC) and robust SRKC (R-SRKC).  We discuss applications of the methods developed here to real perception and calibration systems, and to preserve pedagogical value, we choose to implement the accompanying code in Python and release it as open-source.
+Calibration is a critical step in building safe and reliable autonomous systems.  Cameras, LiDAR sensors, gyroscopes, inertial measurement units, and other devices give various information about the world around a system.  Effective algorithms for calibration can quickly give the user correct parameters that characterize those devices---previously unknown positions, scales, focal lengths, distortion coefficients, or orientations in space.  Many problems in calibration, however, suffer from various nonconvexities that make global estimation of these parameters difficult to determine correctly, certifiably, or in polynomial time.  Clever convex reformulations of these problems can often bypass these difficulties and achieve correct and certifiable solutions quickly.  Here, we study Similarity Registration with Known Correspondences (SRKC), a common problem in calibration and point cloud registration involving estimation over a Lie group under isotropic Gaussian noise.  We develop a convex formulation and show how it extends to three variants of the problem: constrained SRKC (C-SRKC), quaternion SRKC (q-SRKC), and robust SRKC (R-SRKC).  We discuss applications of the methods developed here to real perception and calibration systems, and to preserve pedagogical value, we choose to implement the accompanying code in Python and release it as open-source.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -126,13 +126,9 @@ and then take \( \sigma_1^2, \sigma_2^2 \rightarrow \infty \) such that we assum
 
 I know that SRKC doesn't look like a typical calibration problem.  It looks like a point registration problem---because it is a point registration problem.  On the one hand, SRKC is definitely useful in calibration.  Imagine I have a LiDAR sensor that outputs point clouds and I am calibrating it against an object with a known shape (like a 3D-printed Stanford bunny) \cite{stanford}, but the sensor outputs point locations in an arbitrary and unknown distance unit.  SRKC would be incredibly useful in a ``similarity iterative closest-point" (similarity ICP) calibration tool for this LiDAR sensor.  On the other hand, solving SRKC is a wonderful exercise because it exposes so clearly many of the problems in calibration.  It requires us to work with Lie groups and non-Euclidean manifolds, it has plenty of local minima to frustrate us, and yet with a bit of coaxing it quickly admits powerful solution techniques which give global optimality.
 
-\section{Mathematical Preliminaries}
-
-\textit{description of Lie groups, manifold optimization, etc.}
-
 \section{Nonconvexities in Calibration}
 
-\subsection{Nonconvexity from Rotations}
+\subsection{Nonconvexity from Bilinearity}
 
 The optimization (\ref{eq:srkc}) allows us to solve for the similarity transform \( s^\star, R^\star, t^\star \) that relates two point clouds.  We write the objective again below for convenience, dropping the irrelevant constant factor.
 
@@ -140,13 +136,15 @@ The optimization (\ref{eq:srkc}) allows us to solve for the similarity transform
 	s^\star, R^\star, t^\star = \arg\min_{s, R, t} \sum_{i=1}^N \left[\left\Vert y_i - s R x_i - t \right\Vert_2^2 \right]
 \end{equation}
 
-The (squared) \( \ell_2 \) norm is a convex function of its input, and the inner vector term \( y_i - s R x_i - t \) is convex jointly in \( s, R, t \)---typically, products of variables (such as \( s R \)) are nonconvex, but in this case, because \( s \ge 0 \), the expression is actually convex.  Because the objective is a linear combination of convex, non-decreasing functions (\( \ell_2 \) norms) of convex expressions, the entire objective here is convex \cite{dcp}.  Unfortunately for us, \( R \) must be a proper rotation (\( R \in \mathrm{SO(3)} \)) and the set of all proper rotations (the Lie group \( \mathrm{SO(3)} \)) is nonconvex.
+The (squared) \( \ell_2 \) norm is a convex function of its input, but the inner vector term \( y_i - s R x_i - t \) is not convex jointly in \( s, R, t \)---\textit{bilinearity} introduced by products of variables (such as \( s R \)) are nonconvex.  The objective is a linear combination of convex, non-decreasing functions (\( \ell_2 \) norms) of nonconvex expressions, so the entire objective here is nonconvex \cite{dcp}.  This nonconvexity is strongly representative of the challenges due to nonconvexity in optimization-based calibration---in general, any time a product of decision variables arises, we can expect the objective to be nonconvex (unless a simplification exists).
 
-This nonconvexity is highly representative of the type encountered in calibration.  Estimating rotation is critical in nearly every calibration problem, and the set of all rotations is a nonconvex set.  We will see the challenges that this presents in a bit---and we will also explore methods for coaxing the problem into a convex formulation for solution and formal certification.  However, another nonconvexity exists in calibration as well, albeit a more nefarious and more subtle type.
+\subsection{Nonconvexity from Rotations}
+
+The bilinearity is not the only source of nonconvexity in (\ref{eq:srkc}).  Unfortunately for us, \( R \) must be a proper rotation (\( R \in \mathrm{SO(3)} \)) and the set of all proper rotations (the Lie group \( \mathrm{SO(3)} \)) is nonconvex.  This nonconvexity is also highly representative of the type encountered in calibration.  Estimating rotation is critical in nearly every calibration problem, and the set of all rotations is a nonconvex set.  We will see the challenges that this presents in a bit---and we will also explore methods for coaxing the problem into a convex formulation for solution and formal certification.  However, a final nonconvexity exists in some calibration problems as well, albeit a more nefarious and more subtle type.
 
 \subsection{Nonconvexity from Mixed-Integer Formulations}
 
-\textit{explain nonconvexity from MIP}
+Nonconvexity also originates in calibration through \textit{robust approaches} that have mixed-integer formulations.  Often, part of the calibration process is determining which data are ``inliers" and which data are ``outliers".  For \( N \) independent measurements, there are \( 2^N \) possible classifications.  The ``inlier"/``outlier" taxonomy can be written in terms of binary decision variables \( \theta_i = \pm 1 \) for each of \( i = 1, 2, \cdots N \), such that \( \theta_i = +1 \) indicates that point \( i \) is an inlier and \( \theta_i = -1 \) indicates that point \( i \) is an outlier.  This allows us to construct \textit{mixed-integer programming} (MIP) formulations for robust calibration or registration systems.  MIP is inherently nonconvex (as the feasible set is disconnected) and NP-hard due to its combinatorial nature.
 
 \section{Current Approaches to Calibration}
 
@@ -196,18 +194,18 @@ We're now at the heart of this.  We just said above that our constraint \( R \in
 
 \subsection{Relaxation of the Special Orthogonal Group}
 
-Our first example here will be to relax the constraint \( R \in \mathrm{SO(3)} \).  A necessary (but not sufficient)\footnote{Again, we must enforce positivity of the determinant to make sure this is a \textit{proper} rotation.  And again, this is not difficult using a quick SVD check at the end.} condition for \( R \in \mathrm{SO(3)} \) is \( I - R^\top R = 0 \); in other words, the matrix columns must form an orthonormal basis for \( \mathbb{R}^3 \).  Funnily enough, we can actually relax this constraint to
+Our first example here will be to relax the constraint \( R \in \mathrm{SO(3)} \).  A necessary (but not sufficient)\footnote{Again, we must enforce positivity of the determinant to make sure this is a \textit{proper} rotation.  And again, this is not difficult using a quick SVD check at the end.} condition for \( R \in \mathrm{SO(3)} \) is \( I_3 - R^\top R = 0 \); in other words, the matrix columns must form an orthonormal basis for \( \mathbb{R}^3 \).  Funnily enough, we can actually relax this constraint to
 
 \begin{equation}
-	I - R^\top R \succeq 0
+	I_3 - R^\top R \succeq 0
 \end{equation}
 
-(in other words, \( I - R^\top R \) has no negative eigenvalues) and we typically recover globally optimal solutions in practice.  This works because the \textit{positive semidefinite cone} (the set of all matrices with no negative eigenvalues) is actually convex, whereas the set \( \mathrm{SO(3)} \) is nonconvex, and \textit{critically}, all proper rotations satisfy this new condition.  This expression is actually the Schur complement of the larger expression
+(in other words, \( I_3 - R^\top R \) has no negative eigenvalues) and we typically recover globally optimal solutions in practice.  This works because the \textit{positive semidefinite cone} (the set of all matrices with no negative eigenvalues) is actually convex, whereas the set \( \mathrm{SO(3)} \) is nonconvex, and \textit{critically}, all proper rotations satisfy this new condition.  This expression is actually the Schur complement of the larger expression
 
 \begin{equation}
 	\begin{bmatrix}
-		I & R \\
-		R^\top & I \\
+		I_3 & R \\
+		R^\top & I_3 \\
 	\end{bmatrix} \succeq 0
 \end{equation}
 
@@ -217,12 +215,12 @@ and so, in practice, we use this constraint instead because it is linear in \( R
 	R^\star &= \arg\max_{R} \mathrm{tr}( RH ), \\
 	\text{where } H &:= \sum_i (x_i - \bar{x}) (y_i - \bar{y})^\top \\
 	& \begin{bmatrix}
-		I & R \\
-		R^\top & I \\
+		I_3 & R \\
+		R^\top & I_3 \\
 	\end{bmatrix} \succeq 0
 \end{align}
 
-This is easily solved using an ``off-the-shelf" semidefinite programming (SDP) solver.  In practice, this will nearly always recover a proper rotation \( R \in \mathrm{SO(3)} \), even though we did not explicitly impose that requirement.  However, if the problem does not recover a proper rotation, then a simple projection onto the positive semidefinite cone will recover the closest valid rotation (in the least-squares sense).
+This is easily solved using an ``off-the-shelf" semidefinite programming (SDP) solver, such as CVX \cite{cvx}.  In practice, this will nearly always recover a proper rotation \( R \in \mathrm{SO(3)} \), even though we did not explicitly impose that requirement.  However, if the problem does not recover a proper rotation, then a simple projection onto the special orthogonal group will recover the closest valid rotation (in the least-squares sense).
 
 \begin{align}
 	R^\star &= U \Sigma V^\top \\
@@ -231,6 +229,66 @@ This is easily solved using an ``off-the-shelf" semidefinite programming (SDP) s
 		0 & 1 & 0 \\
 		0 & 0 & \det U V^\top
 	\end{bmatrix} V^\top
+\end{align}
+
+\subsection{Constrained SRKC}
+
+A semidefinite programming formulation of ``vanilla" SRKC is technically redundant---after all, the problem can be solved without much difficulty by first eliminating \( s^\star, t^\star \) and then using SVD to determine the optimal rotation matrix \( R^\star \).  However, in the presence of additional constraints, this solution no longer works and our SDP formulation comes to the rescue.  We call this the \textit{constrained similarity registration under known correspondences} (C-SRKC) problem.  The SVD approach to SRKC is no longer useful to us in the C-SRKC variant---we must solve the problem as a convex optimization.  The optimization is written as
+
+\begin{align}
+	s^\star, R^\star, t^\star = \arg\min_{s, R, t} & \sum_{i=1}^N \left[\left\Vert y_i - s R x_i - t \right\Vert_2^2 \right] , \\
+	\text{s.t. } & \text{additional contraints} .
+\end{align}
+
+This optimization is nonconvex because the term \( s R \) in the objective is bilinear and therefore, in general, nonconvex.  Furthermore, the constraint \( R \in \mathrm{SO(3)} \) limits the decision variable \( R \) to a nonconvex feasible set.  Not all hope is lost, however.  With another relaxation, we can solve for the optimal similarity transform using a convex optimization.  First, we introduce the matrix \( Q := s R \) to write
+
+\begin{align}
+	s^\star, Q^\star, t^\star = \arg\min_{s, Q, t} & \sum_{i=1}^N \left[\left\Vert y_i - Q x_i - t \right\Vert_2^2 \right] , \\
+	\text{subject to } & n^\top (Q x_i + t) + b \ge 0 , \\
+	& s^2 I_3 - Q^\top Q = 0 .
+\end{align}
+
+We have now eliminated one of the two nonconvexities, and we introduced the constraint \( Q^\top Q = s^2 I_3 \) as a necessary (but not sufficient) condition for \( R \in \mathrm{SO(3)} \).  Notice that, because \( s \) only appears as \( s^2 \) here, it is not necessary to constrain \( s \ge 0 \).  We can relax this constraint to
+
+\begin{equation}
+	s^2 I_3 - Q^\top Q \succeq 0
+\end{equation}
+
+and linearize it by introducing \( \gamma := s^2 \).  This eliminates \( s \) completely, leaving us only with \( \gamma I_3 - Q^\top Q \succeq 0 \), which is a linear matrix inequality (LMI) and therefore induces a convex feasible set.  Next, we eliminate translation as a decision variable using the result
+
+\begin{equation}
+	t^\star = \frac1N \sum_{i=1}^N \left[ y_i - s^\star R^\star x_i \right]
+\end{equation}
+
+from the previous section.  We write \( a_i := x - \bar{x} \) and \( b_i := y_i - \bar{y} \) for the points in each point cloud, with \( a \) and \( b \) having a shared centroid at the origin, removing \( t \) as a decision variable.  The final steps are to interpret this LMI as the Schur complement of a larger expression, allowing the optimization to admit a standard semidefinite programming form, and to write \( \gamma \ge 0 \) because \( s^2 \ge 0 \).
+
+\begin{align}
+	\gamma^\star, Q^\star = \arg\min_{\gamma, Q, t} & \sum_{i=1}^N \left[\left\Vert b_i - Q a_i \right\Vert_2^2 \right] , \\
+	\text{subject to } & \begin{bmatrix}
+		\gamma I_3 & Q \\
+		Q^\top & I_3 \\
+	\end{bmatrix} \succeq 0 \\
+	& \gamma \ge 0 \\
+	& \text{additional constraints} . \label{eq:addtl}
+\end{align}
+
+Again, this is efficiently solved by an ``off-the-shelf" semidefinite programming solver \cite{cvx}, and in practice this relaxation will often be tight.  We may now write any additional constraints we choose in (\ref{eq:addtl}), including global scale constraints or constraints on translation.  Notice that, conveniently, we can write the translation as affine in the decision variable \( Q \), which makes constraints on \( t \) easy to write.
+
+\begin{equation}
+	t = \frac1N \sum_{i=1}^N \left[ y_i - Q x_i \right]
+\end{equation}
+
+Obviously, we've lost sight of the \textit{actual} variables we care about, \( s^\star, R^\star, t^\star \).  But it's not difficult to recover those using the following relations.
+
+\begin{align}
+	s^\star &= \sqrt{\gamma^\star} \\
+	Q^\star &= U \Sigma V^\top \\
+	R^\star &= U \begin{bmatrix}
+		1 & 0 & 0 \\
+		0 & 1 & 0 \\
+		0 & 0 & \det U V^\top
+	\end{bmatrix} V^\top \\
+	t^\star &= \frac1N \sum_{i=1}^N \left[ y_i - s^\star R^\star x_i \right]
 \end{align}
 
 \subsection{Quaternion SRKC}
@@ -266,7 +324,7 @@ under known global scale \( s \) and known translation \( t \).  This is a \text
 	\{-1, 1\}^N \times \mathrm{Sim(3)}
 \end{equation*}
 
-which is nonconvex in the worst way: the feasible set is disjoint into \( 2^N \) possible points!  There in fact exists a polynomial-time convex formulation for this, which enables \textit{certifiable global optimality} despite not knowing which correspondences are inliers and which are outliers.  I've omitted the full mathematical derivation here, as it is \textit{quite} involved, but I encourage you to check out \cite{quasar} if you're curious.  For the same reason, I have omitted an implementation of R-SRKC from the accompanying source code.
+which is nonconvex in the worst way: the feasible set is disjoint into \( 2^N \) possible points!  There in fact exists a polynomial-time convex formulation for this, which enables \textit{certifiable global optimality} despite not knowing which correspondences are inliers and which are outliers.  I've omitted the full mathematical derivation here, as it is \textit{quite} involved, but I encourage you to check out \cite{quasar} if you're curious---this is a published result in geometric perception.  Due to its extreme complexity, I have omitted an implementation of R-SRKC from the accompanying source code.
 
 I'd like to note that, in practice, robust SRKC can be achieved with not much difficulty using graduated non-convexity (GNC).  But I wanted to take the time to emphasize that you can in fact solve this to \textit{certifiable} global optimality by finding the right convex formulation.
 
@@ -295,6 +353,8 @@ I hold a deep respect for the inspired applied mathematicians, engineers, and re
 \bibitem{kkt} R. Tibshirani. ``Karush-Kuhn-Tucker Conditions." Carnegie Mellon University, \href{https://www.stat.cmu.edu/~ryantibs/convexopt/lectures/kkt.pdf}{https://www.stat.cmu.edu/~ryantibs/convexopt/lectures/kkt.pdf}
 
 \bibitem{quasar} H. Yang and L. Carlone. ``A Quaternion-based Certifiably Optimal Solution to the Wahba Problem with Outliners." Laboratory for Information and Decision Systems, Massachusetts Institute of Technology, \href{https://arxiv.org/pdf/1905.12536}{https://arxiv.org/pdf/1905.12536}
+
+\bibitem{cvx} CVX Research. ``Software for Disciplined Convex Programming." CVX Research, \href{https://cvxr.com/}{https://cvxr.com/}
 
 \end{thebibliography}
 
