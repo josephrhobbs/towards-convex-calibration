@@ -20,10 +20,22 @@ The following shows a registration result on the Stanford bunny ([link to point 
 
 We initialize a test point cloud of __1000 random points__ distributed according to the standard Gaussian about the origin in 3D space.  We then sample random scales from _LogNormal(0, 1)_, random translations from _Normal(0, 1)_ along each axis, and a random rotation according to a uniform distribution over _SO(3)_.  We then perturb the transformed point cloud with isotropic Gaussian noise and use the SRKC solver to estimate the applied similarity transform.
 
-In the plot below, we compare measurement noise (in decibels) and solver error (computed using _triple geodesic distance_, see below) in the plot below.  Measurement noise varies between -80 decibels and 20 decibels, in which +20 dB of measurement noise indicates 10 times the characteristic dimension.  We define the _characteristic dimension_ (mean distance of a point from the origin) of the point cloud under test to be unity.  On an Intel(R) Xeon(R) CPU (2.20 GHz) the solver achieves a p95 (tail) latency of __39 milliseconds__.
+In the plots below, we compare measurement noise (in decibels) and solver error (computed using _triple geodesic distance_, see below).  Measurement noise varies between -80 decibels and 20 decibels, in which +20 dB of measurement noise indicates 10 times the characteristic dimension.  We define the _characteristic dimension_ (mean distance of a point from the origin) of the point cloud under test to be unity.  Latencies are measured on an Intel(R) Xeon(R) CPU with a nominal clock rate of 2.2 GHz.
+
+### Semidefinite Formulation
+
+Using the __constrained SRKC__ method (semidefinite formulation) and no additional constraints, the solver achieves a p95 (tail) latency of __39 milliseconds__.
 
 <p align="center">
 <img src="https://github.com/josephrhobbs/towards-convex-calibration/blob/master/images/noise-vs-error.png" alt="Noise versus solver error for the SRKC solver" width="auto" height="500">
+</p>
+
+### Maximum Eigenvalue Formulation
+
+Using the __quaternion SRKC__ method (eigenvalue formulation), the solver achieves a p95 (tail) latency of __4 milliseconds__.
+
+<p align="center">
+<img src="https://github.com/josephrhobbs/towards-convex-calibration/blob/master/images/qsrkc-noise-vs-error.png" alt="Noise versus solver error for the SRKC solver" width="auto" height="500">
 </p>
 
 ## Project Abstract
