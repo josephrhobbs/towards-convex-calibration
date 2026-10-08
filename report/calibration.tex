@@ -36,7 +36,7 @@
 \epigraph{\textit{The great watershed in optimization is not between linearity and nonlinearity, but convexity and nonconvexity.}}{\vspace*{1.8mm}\textsc{R. Tyrrell Rockafellar}}
 
 \begin{abstract}
-Calibration is a critical step in building safe and reliable autonomous systems.  Cameras, LiDAR sensors, gyroscopes, inertial measurement units, and other devices give various information about the world around a system.  Effective algorithms for calibration can quickly give the user correct parameters that characterize those devices---previously unknown positions, scales, focal lengths, distortion coefficients, or orientations in space.  Many problems in calibration, however, suffer from various nonconvexities that make global estimation of these parameters difficult to determine correctly, certifiably, or in polynomial time.  Clever convex reformulations of these problems can often bypass these difficulties and achieve correct and certifiable solutions quickly.  Here, we study Similarity Registration with Known Correspondences (SRKC), a common problem in calibration and point cloud registration involving estimation over a Lie group under isotropic Gaussian noise.  We develop a convex formulation and show how it extends to three variants of the problem: constrained SRKC (C-SRKC), quaternion SRKC (q-SRKC), and robust SRKC (R-SRKC).  We discuss applications of the methods developed here to real perception and calibration systems, and to preserve pedagogical value, we choose to implement the accompanying code in Python and release it as open-source.
+Calibration is a critical step in building safe and reliable autonomous systems.  Cameras, LiDAR sensors, gyroscopes, inertial measurement units, and other devices give various information about the world around a system.  Effective algorithms for calibration can quickly give the user correct parameters that characterize those devices---previously unknown positions, scales, focal lengths, distortion coefficients, or orientations in space.  Many problems in calibration, however, suffer from various nonconvexities that make globally optimal estimates of these parameters difficult to determine correctly, certifiably, or in polynomial time.  Clever convex reformulations of these problems can often bypass these difficulties and achieve correct and certifiable solutions quickly.  Here, we study Similarity Registration with Known Correspondences (SRKC), a common problem in calibration and point cloud registration involving estimation over a Lie group under isotropic Gaussian noise.  We develop a convex formulation and show how it extends to three variants of the problem: constrained SRKC (C-SRKC), quaternion SRKC (q-SRKC), and robust SRKC (R-SRKC).  We discuss applications of the methods developed here to real perception and calibration systems, and to preserve pedagogical value, we choose to implement the accompanying code in Python and release it as open-source.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -130,7 +130,7 @@ I know that SRKC doesn't look like a typical calibration problem.  It looks like
 
 I would like to note that this work does not discount the value of the Gauss-Newton method, the Levenberg-Marquardt method, and other ``local" solvers, neither does it discount the value of probabilistic or exhaustive methods for robust calibration such as Random Sample Consensus (RANSAC) or Branch-and-Bound (BnB) algorithms.  Although they lack theoretical guarantees, these solvers are often highly effective at calibration in production systems, and with some mild discomfort and hyperparameter tweaking on the user's part they can work extremely well in practice on both convex and nonconvex problems.
 
-I have prepared this report and its associated code to highlight the benefits that convex optimization offers in many (but not all) cases.  I encourage us both to remember, as we work through solution methods for SRKC, that convex optimization should be \textit{another tool in our calibration toolbox}, rather than the ``end-all-be-all" approach for every situation.  Convex programming, despite its polynomial-time convergence, guarantee of global optimality, and highly expressive nature, can still be slower (or intractable) in practice.  But many times, it is an incredibly powerful tool that reveals efficient algorithms for certifiable solutions to problems in calibration.
+I have prepared this report and its associated code to highlight the benefits that convex optimization offers in many (but not all) cases.  I encourage us both to remember, as we work through solution methods for SRKC, that convex optimization should be \textit{another tool in our calibration toolbox}, rather than the ``end-all-be-all" approach for every situation.  Convex programming, despite its polynomial-time convergence, guarantee of global optimality, and highly expressive nature, can still be slower in practice, even if a convex form exists.  But many times, it is an incredibly powerful tool that reveals efficient algorithms for certifiable solutions to problems in calibration.
 
 \section{Nonconvexities in Calibration}
 
@@ -142,7 +142,7 @@ The optimization (\ref{eq:srkc}) allows us to solve for the similarity transform
 	s^\star, R^\star, t^\star = \arg\min_{s, R, t} \sum_{i=1}^N \left[\left\Vert y_i - s R x_i - t \right\Vert_2^2 \right]
 \end{equation}
 
-The (squared) \( \ell_2 \) norm is a convex function of its input, but the inner vector term \( y_i - s R x_i - t \) is not convex jointly in \( s, R, t \)---\textit{bilinearity} introduced by products of variables (such as \( s R \)) are nonconvex.  The objective is a linear combination of convex, non-decreasing functions (\( \ell_2 \) norms) of nonconvex expressions, so the entire objective here is nonconvex \cite{dcp}.  This nonconvexity is strongly representative of the challenges due to nonconvexity in optimization-based calibration---in general, any time a product of decision variables arises, we can expect the objective to be nonconvex (unless a simplification exists).
+The (squared) \( \ell_2 \) norm is a convex function of its input, but the inner vector term \( y_i - s R x_i - t \) is not convex jointly in \( s, R, t \)---\textit{bilinearity} introduced by products of variables (such as \( s R \)) is nonconvex.  The objective is a linear combination of convex, non-decreasing functions (\( \ell_2 \) norms) of nonconvex expressions, so the entire objective here is nonconvex \cite{dcp}.  This is strongly representative of the challenges due to nonconvexity in optimization-based calibration---in general, any time a product of decision variables arises, we can expect the objective to be nonconvex (unless a simplification exists).
 
 \subsection{Nonconvexity from Rotations}
 
@@ -188,11 +188,11 @@ This problem easily admits the solution to the \textit{orthogonal Procrustes} pr
 	\therefore R^\star &= V U^\top
 \end{align}
 
-and derive \( s^\star, t^\star \) subsequently.\footnote{Technically, this doesn't \textit{quite} work because it has no way of enforcing \( \det(R^\star) = 1 \); it only enforces \( \det(R^\star) = \pm 1 \).  If the determinant is negative, then it is easy to write \( R^\star = V \, \mathrm{diag}(1, 1, -1) \, U^\top \). }  However, under various modifications, such as quaternion SRKC or robust SRKC, this problem no longer admits the same SVD solution.  Therefore it is important to develop a more generalizable way of thinking about SRKC.  This brings us to the main focus of this document: exploiting \textit{convexity} in calibration and registration.
+and derive \( s^\star, t^\star \) subsequently.\footnote{Technically, this doesn't \textit{quite} work because it has no way of enforcing \( \det(R^\star) = 1 \); it only enforces \( \det(R^\star) = \pm 1 \).  If the determinant is negative, then it is easy to write \( R^\star = V \, \mathrm{diag}(1, 1, -1) \, U^\top \). }  However, under various modifications, such as constrained SRKC or robust SRKC, this problem no longer admits the same SVD solution.  Therefore it is important to develop a more generalizable way of thinking about SRKC.  This brings us to the main focus of this document: exploiting \textit{convexity} in calibration and registration.
 
 \section{Convex Formulations for Calibration}
 
-We're now at the heart of this.  We just said above that our constraint \( R \in \mathrm{SO(3)} \) was nonconvex.  So why are we thinking about convexity in calibration?  Because \textit{properly formulated, many optimizations can be treated as convex} even if the original problem was not.  I emphasized earlier that a benefit of convexity is \textit{certifiability}.  This means that, if the Karush-Kuhn-Tucker conditions (KKT) are satisfied for an optimizer of the convex formulation, we have \textit{mathematical proof} that we've found the \textit{global optimizer} for our estimation problem \cite{kkt}.  It is a tremendous peace of mind to have rigorous \textit{proof that we can't do any better}---if our solution is KKT, then there is no better solution elsewhere in the feasible set.
+We're now at the heart of this.  We just said above that our constraint \( R \in \mathrm{SO(3)} \) was nonconvex.  So why are we thinking about convexity in calibration?  Because \textit{properly formulated, many optimizations can be treated as convex} even if the original problem was not.  I emphasized earlier that a benefit of convexity is \textit{certifiability}.  This means that, if the Karush-Kuhn-Tucker conditions (KKT) are satisfied for an optimizer of the convex formulation, we have \textit{mathematical proof} that we've found the \textit{global optimizer} for our estimation problem \cite{kkt}.  It is a tremendous peace of mind to have \textit{rigorous proof that we can't do any better}---if our solution is KKT, then there is no better solution elsewhere in the feasible set.
 
 \subsection{Relaxation of the Special Orthogonal Group}
 
@@ -211,7 +211,7 @@ Our first example here will be to relax the constraint \( R \in \mathrm{SO(3)} \
 	\end{bmatrix} \succeq 0
 \end{equation}
 
-and so, in practice, we use this constraint instead because it is linear in \( R \).  We now have a completely \textit{convex} formulation by removing the constraint \( R \in \mathrm{SO(3)} \) and replacing it with our new linear matrix inequality (LMI).
+and so, in practice, we use this constraint instead because it is linear in \( R \).  We now have a completely \textit{convex} formulation by removing the constraint \( R \in \mathrm{SO(3)} \) and replacing it with our new \textit{linear matrix inequality} (LMI).
 
 \begin{align}
 	R^\star &= \arg\max_{R} \mathrm{tr}( RH ), \\
@@ -256,7 +256,7 @@ We have now eliminated one of the two nonconvexities, and we introduced the cons
 	s^2 I_3 - Q^\top Q \succeq 0
 \end{equation}
 
-and linearize it by introducing \( \gamma := s^2 \).  This eliminates \( s \) completely, leaving us only with \( \gamma I_3 - Q^\top Q \succeq 0 \), which is a linear matrix inequality (LMI) and therefore induces a convex feasible set.  Next, we eliminate translation as a decision variable using the result
+and linearize it by introducing \( \gamma := s^2 \).  This eliminates \( s \) completely, leaving us only with \( \gamma I_3 - Q^\top Q \succeq 0 \), which is equivalent to an LMI via the Schur complement ``trick" I showed earlier, and therefore induces a convex feasible set.  Next, we eliminate translation as a decision variable using the result
 
 \begin{equation}
 	t^\star = \frac1N \sum_{i=1}^N \left[ y_i - s^\star R^\star x_i \right]
@@ -322,7 +322,7 @@ until the algorithm converges, and \( q_k \) is guaranteed to be the eigenvector
 
 \subsection{Robust SRKC}
 
-The introduction of quaternions is not only useful for solving SRKC in the absence of an SDP solver---it is also useful for solving the SRKC problem in the presence of \textit{outlier correspondences}.  Imagine that, with probability \( 1 - \eta \) (where \( \eta \) is the ``inlier fraction"), the point pair \( (x_i, y_i) \) are labeled as a correspondence pair despite \textit{not} being related by the generative model
+The introduction of quaternions is not only useful for solving SRKC in the absence of an SDP solver---it is also useful for solving the SRKC problem in the presence of \textit{outlier correspondences}.  Imagine that, with probability \( 1 - \eta \) (where \( \eta \) is the ``inlier fraction"), the point pair \( (x_i, y_i) \) is labeled as a correspondence pair despite \textit{not} being related by the generative model
 
 \begin{equation}
 	y_i = s R x_i + t + \varepsilon_i .
@@ -340,7 +340,7 @@ under known global scale \( s \) and known translation \( t \).  This is a \text
 	\{-1, 1\}^N \times \mathrm{Sim(3)}
 \end{equation*}
 
-which is nonconvex in the worst way: the feasible set is disjoint into \( 2^N \) possible points!  There in fact exists a polynomial-time convex formulation for this, which enables \textit{certifiable global optimality} despite not knowing which correspondences are inliers and which are outliers.  I've omitted the full mathematical derivation here, as it is \textit{quite} involved, but I encourage you to check out \cite{quasar} if you're curious---this is a published result in geometric perception.  Due to its extreme complexity, I have omitted an implementation of R-SRKC from the accompanying source code.
+which is nonconvex in the worst way: the feasible set is split into \( 2^N \) possible disconnected sets!  There in fact exists a polynomial-time convex formulation for this, which enables \textit{certifiable global optimality} despite not knowing which correspondences are inliers and which are outliers.  I've omitted the full mathematical derivation here, as it is \textit{quite} involved, but I encourage you to check out \cite{quasar} if you're curious---this is a recently published result in geometric perception.  Due to its extreme complexity, I have omitted an implementation of R-SRKC from the accompanying source code.
 
 I'd like to note that, in practice, robust SRKC can be achieved with not much difficulty using graduated non-convexity (GNC).  But I wanted to take the time to emphasize that you can in fact solve this to \textit{certifiable} global optimality by finding the right convex formulation.
 
@@ -352,7 +352,7 @@ We've now seen four ways of approaching the problem of Similarity Registration u
 	\item A \textit{vanilla} SRKC approach, using either SVD or convex optimization to solve for the optimal rotation, followed by determination of the optimal scale and translation;
 	\item A \textit{constrained} SRKC approach which extends the vanilla SRKC convex formulation in the presence of constraints, such as minimum or maximum global scales;
 	\item A \textit{quaternion} SRKC approach which solves the unconstrained problem in the absence of a dedicated semidefinite programming or singular value decomposition solver; and
-	\item A \textit{robust} SRKC approach which simultaneously classifies correspondences as ``inlier" or ``outlier".
+	\item A \textit{robust} SRKC approach which simultaneously solves the registration problem and classifies correspondences as ``inlier" or ``outlier".
 \end{enumerate}
 
 All of these methods but q-SRKC involved a convex optimization, and all of them enabled the problem to be solved to \textit{global optimality} efficiently.  This highlights the expressivity of convex optimization as a language for expressing problems in calibration.
